@@ -3,8 +3,8 @@
 // content CDN, so it always shows the latest data without needing a
 // Vercel redeploy every time a new check runs.
 window.MONITOR_CONFIG = {
-  owner: "YOUR_GITHUB_USERNAME",
-  repo: "YOUR_REPO_NAME",
+  owner: "Bearzpu",
+  repo: "Utopia-Downtime-Tracker",
   branch: "main",
   dataPath: "data/uptime_log.json",
   refreshSeconds: 60, // how often the open dashboard page re-fetches data
