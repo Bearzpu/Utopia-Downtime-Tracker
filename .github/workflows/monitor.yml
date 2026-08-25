@@ -2,21 +2,22 @@ name: Uptime Monitor
 
 on:
   schedule:
-    # Every 5 minutes. GitHub may delay this slightly during high load,
-    # especially on the free tier - that's normal and fine for this use case.
     - cron: "*/5 * * * *"
-  workflow_dispatch: {} # lets you trigger a manual check from the Actions tab
+  workflow_dispatch: {}
 
-permissions:
-  contents: write # needed so the workflow can commit the updated data files
-
+# --- FIX #1: prevents two runs from colliding ---
+# If a run is already in progress when the next scheduled one wants to
+# start, the new one waits in a queue instead of racing the first one
+# to commit. This is what was causing the merge conflict.
 concurrency:
   group: uptime-monitor
-  cancel-in-progress: false # never cancel a run mid-write; just queue the next one
+  cancel-in-progress: false
 
 jobs:
   check:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Check out repo
         uses: actions/checkout@v5
@@ -27,19 +28,28 @@ jobs:
           node-version: "22"
 
       - name: Run site check
-        env:
-          MONITOR_URL: ${{ vars.MONITOR_URL || 'https://utopia-game.com' }}
         run: node scripts/check-site.mjs
+        env:
+          MONITOR_URL: ${{ vars.MONITOR_URL }}
 
+      # --- FIX #2: commit step now retries instead of dying on conflict ---
       - name: Commit updated data
         run: |
           git config user.name "uptime-monitor-bot"
-          git config user.email "actions@users.noreply.github.com"
-          git add data/uptime_log.json data/uptime_log.csv
-          if git diff --cached --quiet; then
-            echo "No changes to commit."
-          else
-            git commit -m "Log uptime check $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
-            git pull --rebase origin main
-            git push
-          fi
+          git config user.email "actions@github.com"
+          git add data/
+
+          # If there's nothing new to commit, just stop here cleanly.
+          git commit -m "Log uptime check $(date -u +%Y-%m-%dT%H:%M:%SZ)" || exit 0
+
+          # Try to push. If another run snuck in first, pull the latest
+          # changes and try again — up to 3 times — instead of failing.
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push origin main && exit 0
+            echo "Push failed, retrying ($i)..."
+            git rebase --abort || true
+            sleep 5
+          done
+
+          echo "Could not push after 3 attempts."
+          exit 1
