@@ -1,1 +1,2 @@
-timestamp,status,http_status_code,response_time_ms,maintenance_detected,maintenance_text,error_message
+timestamp,status,http_status_code,response_time_ms,maintenance_detected,maintenance_text,maintenance_stated_minutes,maintenance_started_at_raw,error_message
+2026-08-25T09:16:49.805Z,UP,200,422,false,,,,
