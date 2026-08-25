@@ -9,5 +9,27 @@
     "maintenance_stated_minutes": null,
     "maintenance_started_at_raw": "",
     "error_message": ""
+  },
+  {
+    "timestamp": "2026-08-25T09:46:01.735Z",
+    "status": "UP",
+    "http_status_code": 200,
+    "response_time_ms": 599,
+    "maintenance_detected": false,
+    "maintenance_text": "",
+    "maintenance_stated_minutes": null,
+    "maintenance_started_at_raw": "",
+    "error_message": ""
+  },
+  {
+    "timestamp": "2026-08-25T09:49:57.846Z",
+    "status": "UP",
+    "http_status_code": 200,
+    "response_time_ms": 292,
+    "maintenance_detected": false,
+    "maintenance_text": "",
+    "maintenance_stated_minutes": null,
+    "maintenance_started_at_raw": "",
+    "error_message": ""
   }
 ]
