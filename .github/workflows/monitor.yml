@@ -1,0 +1,45 @@
+name: Uptime Monitor
+
+on:
+  schedule:
+    # Every 5 minutes. GitHub may delay this slightly during high load,
+    # especially on the free tier - that's normal and fine for this use case.
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {} # lets you trigger a manual check from the Actions tab
+
+permissions:
+  contents: write # needed so the workflow can commit the updated data files
+
+concurrency:
+  group: uptime-monitor
+  cancel-in-progress: false # never cancel a run mid-write; just queue the next one
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run site check
+        env:
+          MONITOR_URL: ${{ vars.MONITOR_URL || 'https://utopia-game.com' }}
+        run: node scripts/check-site.mjs
+
+      - name: Commit updated data
+        run: |
+          git config user.name "uptime-monitor-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/uptime_log.json data/uptime_log.csv
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Log uptime check $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            git pull --rebase origin main
+            git push
+          fi
