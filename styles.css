@@ -207,6 +207,15 @@ main {
 .chart-wrap { width: 100%; overflow-x: auto; }
 .chart-wrap svg { display: block; width: 100%; height: auto; }
 
+.chart-axis-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  fill: var(--ink-faint);
+}
+.chart-axis-label--avg {
+  fill: var(--gold-bright);
+}
+
 .legend {
   display: flex;
   gap: 20px;

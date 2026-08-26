@@ -127,22 +127,47 @@
     els.timelineWrap.innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMinYMid meet" role="img" aria-label="Uptime timeline">${bars}</svg>`;
   }
 
+  // Rounds a max value up to a "nice" number (multiple of 1/2/5 * 10^n) so
+  // axis ticks read as sane round numbers instead of e.g. "437.3ms".
+  function niceCeil(value) {
+    if (value <= 0) return 10;
+    const exp = Math.floor(Math.log10(value));
+    const magnitude = Math.pow(10, exp);
+    const frac = value / magnitude;
+    let niceFrac;
+    if (frac <= 1) niceFrac = 1;
+    else if (frac <= 2) niceFrac = 2;
+    else if (frac <= 5) niceFrac = 5;
+    else niceFrac = 10;
+    return niceFrac * magnitude;
+  }
+
   function renderResponseChart(rows) {
     const withTimes = rows.filter((r) => typeof r.response_time_ms === "number");
     if (!withTimes.length) {
       els.responseWrap.innerHTML = '<p class="empty-state">No response-time data yet.</p>';
       return;
     }
-    const w = Math.max(rows.length * 6, 600);
-    const h = 160;
-    const pad = 12;
-    const max = Math.max(...withTimes.map((r) => r.response_time_ms), 10);
+
+    const leftPad = 56;
+    const rightPad = 12;
+    const topPad = 14;
+    const bottomPad = 26;
+    const plotW = Math.max(rows.length * 6, 600);
+    const plotH = 160;
+    const w = plotW + leftPad + rightPad;
+    const h = plotH + topPad + bottomPad;
+
+    const rawMax = Math.max(...withTimes.map((r) => r.response_time_ms), 10);
+    const max = niceCeil(rawMax * 1.05);
+    const avg = withTimes.reduce((sum, r) => sum + r.response_time_ms, 0) / withTimes.length;
+
+    const xFor = (i) => leftPad + i * 6 + 2;
+    const yFor = (val) => topPad + plotH - (val / max) * plotH;
 
     const points = rows.map((r, i) => {
-      const x = i * 6 + 2;
       const val = typeof r.response_time_ms === "number" ? r.response_time_ms : 0;
-      const y = h - pad - (val / max) * (h - pad * 2);
-      return { x, y, status: r.status };
+      return { x: xFor(i), y: yFor(val), status: r.status };
     });
 
     const path = points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y.toFixed(1)}`).join(" ");
@@ -150,10 +175,38 @@
       `<circle cx="${p.x}" cy="${p.y.toFixed(1)}" r="2.2" fill="${p.status === "UP" ? "var(--up)" : "var(--down)"}" />`
     ).join("");
 
+    // Y axis: 5 evenly spaced gridlines/labels from 0 to max, in ms.
+    const yTickCount = 4;
+    const yTicks = Array.from({ length: yTickCount + 1 }, (_, i) => Math.round((max / yTickCount) * i));
+    const yAxis = yTicks.map((val) => {
+      const y = yFor(val);
+      return `
+        <line x1="${leftPad}" y1="${y.toFixed(1)}" x2="${leftPad + plotW}" y2="${y.toFixed(1)}" stroke="var(--border)" stroke-width="1" opacity="0.6" />
+        <text x="${leftPad - 8}" y="${y.toFixed(1)}" text-anchor="end" dominant-baseline="middle" class="chart-axis-label">${val}ms</text>`;
+    }).join("");
+
+    // X axis: up to ~7 evenly spaced timestamp labels along the bottom.
+    const xTickCount = Math.min(7, rows.length);
+    const xAxis = Array.from({ length: xTickCount }, (_, i) => {
+      const idx = xTickCount === 1 ? 0 : Math.round((i * (rows.length - 1)) / (xTickCount - 1));
+      const x = xFor(idx);
+      return `<text x="${x}" y="${topPad + plotH + 18}" text-anchor="middle" class="chart-axis-label">${escapeXml(fmtTime(rows[idx].timestamp))}</text>`;
+    }).join("");
+
+    const avgY = yFor(avg);
+    const avgLine = `
+      <line x1="${leftPad}" y1="${avgY.toFixed(1)}" x2="${leftPad + plotW}" y2="${avgY.toFixed(1)}" stroke="var(--gold-bright)" stroke-width="1" stroke-dasharray="4 3" opacity="0.8" />
+      <text x="${leftPad + plotW - 4}" y="${(avgY - 5).toFixed(1)}" text-anchor="end" class="chart-axis-label chart-axis-label--avg">avg ${Math.round(avg)}ms</text>`;
+
     els.responseWrap.innerHTML = `
-      <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMinYMid meet" role="img" aria-label="Response time over time">
+      <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMinYMid meet" role="img" aria-label="Response time over time, in milliseconds">
+        ${yAxis}
+        <line x1="${leftPad}" y1="${topPad}" x2="${leftPad}" y2="${topPad + plotH}" stroke="var(--border)" stroke-width="1" />
+        <line x1="${leftPad}" y1="${topPad + plotH}" x2="${leftPad + plotW}" y2="${topPad + plotH}" stroke="var(--border)" stroke-width="1" />
         <path d="${path}" fill="none" stroke="var(--gold)" stroke-width="1.2" opacity="0.55" />
+        ${avgLine}
         ${dots}
+        ${xAxis}
       </svg>`;
   }
 
