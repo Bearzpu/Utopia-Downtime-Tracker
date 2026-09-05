@@ -1,8 +1,13 @@
 name: Uptime Monitor
 
 on:
+  # Hourly failsafe only. The real 5-minute cadence comes from the
+  # Cloudflare Worker in cf-trigger/, which calls workflow_dispatch on
+  # its own clock — GitHub's schedule trigger isn't reliable at 5-minute
+  # granularity (observed gaps of 2-5 hours under load). This schedule
+  # just keeps checks happening if the Worker is ever down.
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "0 * * * *"
   workflow_dispatch: {}
 
 # --- FIX #1: prevents two runs from colliding ---

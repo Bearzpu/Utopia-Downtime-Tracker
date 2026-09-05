@@ -46,11 +46,15 @@ this workflow needs to commit the updated data file back. In your repo:
 
 Go to the **Actions** tab. You should see "Uptime Monitor" listed. Click it
 → **Run workflow** to trigger a manual check right away rather than waiting
-5 minutes. After it finishes, `data/uptime_log.json` in your repo should
-have one entry.
+for the schedule. After it finishes, `data/uptime_log.json` in your repo
+should have one entry.
 
-(The `*/5 * * * *` schedule means every 5 minutes, but GitHub can delay
-scheduled runs by a few minutes under load — that's normal.)
+**Important:** GitHub's own `schedule:` trigger is not reliable at 5-minute
+granularity — under load, GitHub silently spaces out high-frequency
+scheduled workflows (we observed gaps of 2–5 hours instead of 5 minutes).
+The `schedule:` cron in `monitor.yml` is now just an hourly failsafe. The
+real 5-minute cadence comes from a **Cloudflare Worker** — see
+[`cf-trigger/`](cf-trigger/) below.
 
 ### 4. Point the dashboard at your repo
 
@@ -82,6 +86,49 @@ doesn't need to redeploy when new checks come in; the page fetches fresh
 JSON straight from GitHub every time it's loaded (and every 60s while
 it's open).
 
+## Reliable 5-minute triggering (Cloudflare Worker)
+
+GitHub's `schedule:` trigger isn't honoured reliably at 5-minute intervals —
+GitHub silently throttles high-frequency scheduled workflows under load, so
+checks can end up hours apart instead of minutes. To get an actual 5-minute
+cadence, a small Cloudflare Worker in [`cf-trigger/`](cf-trigger/) runs on
+Cloudflare's own Cron Trigger and calls GitHub's `workflow_dispatch` API
+directly, bypassing GitHub's scheduler entirely. `monitor.yml`'s own
+`schedule:` cron is kept as an hourly failsafe in case the Worker is down.
+
+### One-time setup
+
+1. **Create a GitHub PAT** scoped to just this repo:
+   Settings (your GitHub account) → Developer settings → Personal access
+   tokens → Fine-grained tokens → **Generate new token**. Set:
+   - Repository access: only this repo
+   - Permissions: **Actions → Read and write**
+   Copy the token — you won't see it again.
+
+2. **Install Wrangler** (Cloudflare's CLI) if you don't have it:
+   ```bash
+   npm install -g wrangler
+   wrangler login
+   ```
+
+3. **Deploy the Worker**:
+   ```bash
+   cd cf-trigger
+   wrangler secret put GITHUB_PAT
+   # paste the token from step 1 when prompted
+   wrangler deploy
+   ```
+
+That's it — Cloudflare's free plan includes Cron Triggers, and 5-minute
+invocations are well within the free tier's daily request limit. Check
+**Cloudflare dashboard → Workers & Pages → utopia-uptime-trigger → Triggers**
+to confirm the cron is active, and **Cron Events** in the same dashboard to
+see it firing.
+
+If you ever move the repo or rename the workflow file, update the
+`GITHUB_OWNER` / `GITHUB_REPO` / `GITHUB_WORKFLOW_FILE` values in
+`cf-trigger/wrangler.toml` and redeploy.
+
 ## Changing the monitored URL
 
 Default target is `https://utopia-game.com`. To point at something else
@@ -98,6 +145,7 @@ new variable `MONITOR_URL` with your URL.
 | `data/uptime_log.json` / `.csv` | The growing log — this is your "spreadsheet" |
 | `index.html`, `styles.css`, `app.js` | The dashboard Vercel serves |
 | `config.js` | The one file you edit — your GitHub owner/repo |
+| `cf-trigger/` | Cloudflare Worker that triggers the check reliably every 5 minutes |
 
 ## Testing the checker locally (optional)
 

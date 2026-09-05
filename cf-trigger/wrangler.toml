@@ -1,0 +1,17 @@
+name = "utopia-uptime-trigger"
+main = "src/index.js"
+compatibility_date = "2026-01-01"
+
+# Fires every 5 minutes on Cloudflare's clock and calls GitHub's
+# workflow_dispatch API — see src/index.js for why this exists.
+[triggers]
+crons = ["*/5 * * * *"]
+
+[vars]
+GITHUB_OWNER = "Bearzpu"
+GITHUB_REPO = "Utopia-Downtime-Tracker"
+GITHUB_WORKFLOW_FILE = "monitor.yml"
+GITHUB_REF = "main"
+
+# GITHUB_PAT is a secret, not a var — set it with:
+#   wrangler secret put GITHUB_PAT
