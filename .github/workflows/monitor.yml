@@ -6,8 +6,14 @@ on:
   # its own clock — GitHub's schedule trigger isn't reliable at 5-minute
   # granularity (observed gaps of 2-5 hours under load). This schedule
   # just keeps checks happening if the Worker is ever down.
-  schedule:
-    - cron: "0 * * * *"
+  #
+  # PAUSED 2026-10-06: the age has finished. The hourly schedule is removed
+  # and the job is skipped (`if: false`) so any leftover Worker dispatches do
+  # nothing and commit nothing. To resume: restore the schedule block below
+  # and delete the `if: false` line on the job.
+  #
+  # schedule:
+  #   - cron: "0 * * * *"
   workflow_dispatch: {}
 
 # --- FIX #1: prevents two runs from colliding ---
@@ -20,6 +26,7 @@ concurrency:
 
 jobs:
   check:
+    if: false
     runs-on: ubuntu-latest
     permissions:
       contents: write
